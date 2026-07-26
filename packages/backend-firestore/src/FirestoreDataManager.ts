@@ -63,6 +63,7 @@ const defaultFirebaseDataManagerOptions: FirebaseDataManagerOptions = {
 export interface QueryParams<T> {
     readonly filters?: Array<FilterBy<T & FirestoreSerializedMetadata>>
     readonly orderBy?: Array<OrderBy<T & FirestoreSerializedMetadata>>
+    readonly limit?: number
 }
 
 export class FirestoreDataManager<
@@ -332,6 +333,13 @@ export class FirestoreDataManager<
         params?.orderBy?.forEach(orderBy => {
             compoundQuery = this.firestore.query(compoundQuery, this.firestore.orderBy(orderBy[0], orderBy[1]))
         })
+
+        if (params?.limit !== undefined) {
+            if (!Number.isInteger(params.limit) || params.limit <= 0) {
+                throw new FirestoreDataManagerError(`Query limit must be a positive integer, got: ${params.limit}`)
+            }
+            compoundQuery = this.firestore.query(compoundQuery, this.firestore.limit(params.limit))
+        }
 
         return compoundQuery
     }

@@ -61,6 +61,15 @@ describe('count', () => {
         assert.equal(total, 2)
     })
 
+    test('counts with limit', async () => {
+        await productModel.createProduct({ name: 'A', desciption: 'a', qty: 1, data: { a: 1 } })
+        await productModel.createProduct({ name: 'B', desciption: 'b', qty: 2, data: { a: 1 } })
+        await productModel.createProduct({ name: 'C', desciption: 'c', qty: 3, data: { a: 1 } })
+
+        const total = await productModel.countProducts({ limit: 2 })
+        assert.equal(total, 2)
+    })
+
     test('counts with greater than filter', async () => {
         await productModel.createProduct({ name: 'A', desciption: 'a', qty: 5, data: { a: 1 } })
         await productModel.createProduct({ name: 'B', desciption: 'b', qty: 15, data: { a: 1 } })

@@ -1,4 +1,4 @@
-import { Firestore, FirestoreReferenceError } from '@data-weave/backend-firestore'
+import { Firestore, FirestoreDataManagerError, FirestoreReferenceError } from '@data-weave/backend-firestore'
 import { FirebaseProductModel, productConverter } from '@test-fixtures/product'
 import { getSDK, sleep } from '@test-fixtures/utils'
 import assert from 'node:assert/strict'
@@ -156,6 +156,49 @@ describe('Firebase static tests', () => {
 
         await listRef.resolve()
         assert.equal(listRef.values.length, 3)
+    })
+
+    test('Product list respects limit', async () => {
+        await productModel.createProduct({ name: 'A', desciption: 'a', qty: 1, data: { a: 1 } })
+        await productModel.createProduct({ name: 'B', desciption: 'b', qty: 2, data: { a: 1 } })
+        await productModel.createProduct({ name: 'C', desciption: 'c', qty: 3, data: { a: 1 } })
+
+        const listRef = productModel.getProductList({ limit: 2 })
+        await listRef.resolve()
+
+        assert.equal(listRef.values.length, 2)
+    })
+
+    test('Product list limit applies after ordering', async () => {
+        await productModel.createProduct({ name: 'A', desciption: 'a', qty: 10, data: { a: 1 } })
+        await productModel.createProduct({ name: 'B', desciption: 'b', qty: 30, data: { a: 1 } })
+        await productModel.createProduct({ name: 'C', desciption: 'c', qty: 20, data: { a: 1 } })
+
+        const listRef = productModel.getProductList({ orderBy: [['qty', 'desc']], limit: 2 })
+        await listRef.resolve()
+
+        assert.deepEqual(
+            listRef.values.map(v => v.qty),
+            [30, 20]
+        )
+    })
+
+    test('Product list limit combines with filters', async () => {
+        await productModel.createProduct({ name: 'match', desciption: 'a', qty: 1, data: { a: 1 } })
+        await productModel.createProduct({ name: 'match', desciption: 'b', qty: 2, data: { a: 1 } })
+        await productModel.createProduct({ name: 'other', desciption: 'c', qty: 3, data: { a: 1 } })
+
+        const listRef = productModel.getProductList({ filters: [['name', '==', 'match']], limit: 1 })
+        await listRef.resolve()
+
+        assert.equal(listRef.values.length, 1)
+        assert.equal(listRef.values[0].name, 'match')
+    })
+
+    test('Product list rejects invalid limit', () => {
+        assert.throws(() => productModel.getProductList({ limit: 0 }), FirestoreDataManagerError)
+        assert.throws(() => productModel.getProductList({ limit: -1 }), FirestoreDataManagerError)
+        assert.throws(() => productModel.getProductList({ limit: 1.5 }), FirestoreDataManagerError)
     })
 
     test('Product transaction static', async () => {

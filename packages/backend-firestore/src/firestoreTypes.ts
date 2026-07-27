@@ -76,6 +76,18 @@ export interface FirestoreReadOptions {
     readonly transaction?: FirestoreTypes.Transaction
 }
 
+/**
+ * Transaction that can read a whole query, not just a single document.
+ *
+ * Reading queries inside a transaction (`transaction.get(query)`) is Admin SDK specific - the
+ * client SDK `Transaction.get` only accepts a `DocumentReference`.
+ */
+export type QueryReadTransaction = FirestoreTypes.Transaction & {
+    get<AppModelType, DbModelType extends DocumentData>(
+        query: FirestoreTypes.Query<AppModelType, DbModelType>
+    ): Promise<FirestoreTypes.QuerySnapshot<AppModelType, DbModelType>>
+}
+
 export interface FirestoreWriteOptions {
     readonly transaction?: FirestoreTypes.Transaction
     readonly batcher?: FirestoreTypes.WriteBatch

@@ -5,6 +5,10 @@ export function sleep(milliseconds: number) {
     return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
+export function isAdminSDK() {
+    return (process.env.SDK_TYPE || 'JS_SDK') === 'ADMIN_SDK'
+}
+
 export function getSDK() {
     const sdkType = process.env.SDK_TYPE || 'JS_SDK'
 

@@ -1,6 +1,6 @@
 import { Firestore, FirestoreDataManagerError, FirestoreReferenceError } from '@data-weave/backend-firestore'
 import { FirebaseProductModel, productConverter } from '@test-fixtures/product'
-import { getSDK, sleep } from '@test-fixtures/utils'
+import { getSDK, isAdminSDK, sleep } from '@test-fixtures/utils'
 import assert from 'node:assert/strict'
 import { before, beforeEach, describe, test } from 'node:test'
 
@@ -199,6 +199,82 @@ describe('Firebase static tests', () => {
         assert.throws(() => productModel.getProductList({ limit: 0 }), FirestoreDataManagerError)
         assert.throws(() => productModel.getProductList({ limit: -1 }), FirestoreDataManagerError)
         assert.throws(() => productModel.getProductList({ limit: 1.5 }), FirestoreDataManagerError)
+    })
+
+    test('Product readList', async () => {
+        const qty = Math.floor(Math.random() * 1000 + 30000)
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+
+        const products = await productModel.readProductList({ filters: [['qty', '==', qty]] })
+
+        assert.equal(products.length, 2)
+        assert.equal(products[0].name, 'test')
+        assert.ok(products[0].id)
+        assert.ok(products[0].createdAt instanceof Date)
+    })
+
+    test('Product readList respects limit', async () => {
+        const qty = Math.floor(Math.random() * 1000 + 31000)
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+
+        const products = await productModel.readProductList({ filters: [['qty', '==', qty]], limit: 1 })
+
+        assert.equal(products.length, 1)
+    })
+
+    test('Product readList excludes soft deleted', async () => {
+        const qty = Math.floor(Math.random() * 1000 + 32000)
+        const productRef = await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await sleep(500)
+        await productModel.deleteProduct(productRef.id)
+
+        const products = await productModel.readProductList({ filters: [['qty', '==', qty]] })
+
+        assert.equal(products.length, 1)
+        assert.notEqual(products[0].id, productRef.id)
+    })
+
+    // Reading a query inside a transaction is Admin SDK specific
+    test('Product readList in transaction', { skip: !isAdminSDK() }, async () => {
+        const qty = Math.floor(Math.random() * 1000 + 33000)
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await sleep(500)
+
+        const products = await productModel.readProductListWithTransaction({ filters: [['qty', '==', qty]] })
+
+        assert.equal(products.length, 2)
+        assert.equal(products[0].qty, qty)
+        assert.ok(products[0].id)
+    })
+
+    test('Product readList in transaction excludes soft deleted', { skip: !isAdminSDK() }, async () => {
+        const qty = Math.floor(Math.random() * 1000 + 34000)
+        const productRef = await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await sleep(500)
+        await productModel.deleteProduct(productRef.id)
+
+        const products = await productModel.readProductListWithTransaction({ filters: [['qty', '==', qty]] })
+
+        assert.equal(products.length, 1)
+        assert.notEqual(products[0].id, productRef.id)
+    })
+
+    test('Product readList in transaction can be written back', { skip: !isAdminSDK() }, async () => {
+        const qty = Math.floor(Math.random() * 1000 + 35000)
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await productModel.createProduct({ name: 'test', desciption: 'test', qty, data: { a: 1 } })
+        await sleep(500)
+
+        await productModel.addQtyToProductsWithTransaction({ filters: [['qty', '==', qty]] }, 5)
+        await sleep(500)
+
+        const products = await productModel.readProductList({ filters: [['qty', '==', qty + 5]] })
+        assert.equal(products.length, 2)
     })
 
     test('Product transaction static', async () => {

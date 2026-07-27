@@ -34,6 +34,7 @@ import {
     FirestoreWriteOptions,
     InternalFirestoreDataConverter,
     OrderBy,
+    QueryReadTransaction,
     WithFieldValue,
 } from './firestoreTypes'
 import { MergeConverters, checkIfReferenceExists } from './utils'
@@ -128,6 +129,30 @@ export class FirestoreDataManager<
             return data
         }
         return await ref.resolve()
+    }
+
+    /**
+     * Read the documents matching `params` as plain values.
+     *
+     * Without a transaction this resolves the list returned by {@link getList}. When a
+     * `transaction` is passed, the query is read through the transaction so the matched documents
+     * become part of the transaction's read set.
+     *
+     * NOTE: reading a query inside a transaction is Admin SDK specific - the client SDK can only
+     * read single documents inside a transaction. {@link ListPaginationParams} are ignored on the
+     * transaction path, the query is read in full.
+     */
+    public async readList(
+        params?: QueryParams<SerializedT> & ListPaginationParams,
+        options?: FirestoreReadOptions
+    ): Promise<readonly WithMetadata<T>[]> {
+        if (options?.transaction) {
+            const compoundQuery = this._getFilteredQuery(params)
+            const transaction = options.transaction as QueryReadTransaction
+            const snapshot = await transaction.get(compoundQuery)
+            return snapshot.docs.map(doc => doc.data(this.referenceOptions.snapshotOptions))
+        }
+        return await this.getList(params).resolve()
     }
 
     public async create(data: WithFieldValue<WithoutId<T>>, options?: FirebaseCreateOptions) {

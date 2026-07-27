@@ -90,6 +90,31 @@ export class FirebaseProductModel implements ProductModel {
         return this.datamanager.getList(params)
     }
 
+    readProductList(params?: QueryParams<Product>) {
+        return this.datamanager.readList(params)
+    }
+
+    readProductListWithTransaction(params?: QueryParams<Product>) {
+        let values: readonly WithMetadata<Product>[] = []
+        return withTransaction(this.db, async transaction => {
+            values = await this.datamanager.readList(params, { transaction })
+        }).then(() => values)
+    }
+
+    /**
+     * Read every matching product inside a transaction and add `addQty` to each of them,
+     * so the write is guarded by the read set of the query.
+     */
+    addQtyToProductsWithTransaction(params: QueryParams<Product>, addQty: number) {
+        return withTransaction(this.db, async transaction => {
+            const products = await this.datamanager.readList(params, { transaction })
+            // All reads have to happen before the first write inside a transaction
+            for (const product of products) {
+                await this.datamanager.update(product.id, { qty: product.qty + addQty }, { transaction })
+            }
+        })
+    }
+
     updateProduct(id: string, params: UpdateProductParams) {
         return this.datamanager.update(id, params)
     }
